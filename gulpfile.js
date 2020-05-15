@@ -9,15 +9,28 @@ var calc = require('postcss-calc');
 var concat = require('gulp-concat');
 var rename = require('gulp-rename');
 var uglify = require('gulp-uglify');
+var handlebars = require('gulp-compile-handlebars');
+var del = require('del');
 
 // js file paths
 var utilJsPath = 'main/assets/js'; // util.js path - you may need to update this if including the framework as external node module
 var componentsJsPath = 'main/assets/js/components/*.js'; // component js files
-var scriptsJsPath = 'main/assets/js'; //folder for final scripts.js/scripts.min.js files
+var scriptsJsPath = 'dist/assets/js'; //folder for final scripts.js/scripts.min.js files
 
 // css file paths
-var cssFolder = 'main/assets/css'; // folder for final style.css/style-custom-prop-fallbac.css files
+var cssFolder = 'dist/assets/css'; // folder for final style.css/style-custom-prop-fallbac.css files
 var scssFilesPath = 'main/assets/css/**/*.scss'; // scss files to watch
+
+// img file path
+var dstImgFolder = 'dist/assets/img';
+var imgPath = 'main/assets/img/*';
+
+// hbs file paths
+var pagesFolder = 'main/pages'; 
+var partialsFolder = 'main/partials';
+
+// build folder
+var buildFolder = 'dist'
 
 function reload(done) {
   browserSync.reload();
@@ -53,18 +66,43 @@ gulp.task('scripts', function() {
   }));
 });
 
+gulp.task('img', function () {
+  return gulp.src(imgPath)
+    .pipe(gulp.dest(dstImgFolder))
+});
+
+gulp.task('handlebars', function () {
+  return gulp.src(pagesFolder + `/*.hbs`)
+    .pipe(handlebars({}, {
+      ignorePartials: true,
+      batch: [partialsFolder]
+    }))
+    .pipe(rename({
+      extname: '.html'
+    }))
+    .pipe(gulp.dest(buildFolder));
+});
+
 gulp.task('browserSync', gulp.series(function (done) {
   browserSync.init({
     server: {
-      baseDir: 'main'
+      baseDir: buildFolder
     },
     notify: false
   })
   done();
 }));
 
-gulp.task('watch', gulp.series(['browserSync', 'sass', 'scripts'], function () {
-  gulp.watch('main/*.html', gulp.series(reload));
+gulp.task('watch', gulp.series(['sass', 'scripts', 'img', 'handlebars', 'browserSync'], function () {
   gulp.watch('main/assets/css/**/*.scss', gulp.series(['sass']));
+  gulp.watch('main/pages/*.hbs', gulp.series(['handlebars']));
+  gulp.watch('main/partials/**/*.hbs', gulp.series(['handlebars', reload]));
   gulp.watch(componentsJsPath, gulp.series(['scripts']));
+  gulp.watch(imgPath, gulp.series(['img']));
 }));
+
+gulp.task('clean', function () {
+  return del(buildFolder);
+});
+
+gulp.task('build', gulp.series(['clean', 'sass', 'scripts', 'img', 'handlebars']));
